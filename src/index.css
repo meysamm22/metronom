@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+:root {
+  --accent: #6366f1;
+  --accent-glow: #818cf8;
+  --beat-active: #22c55e;
+  --cue-active: #f59e0b;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, select, textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+@keyframes pulse-beat {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.beat-pulse {
+  animation: pulse-beat 0.15s ease-out;
+}
