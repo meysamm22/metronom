@@ -2,32 +2,48 @@ import type { Song } from '../types';
 
 interface Props {
   songs: Song[];
+  loading: boolean;
   onSelect: (song: Song) => void;
   onEdit: (song: Song) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
+  onLogout: () => void;
 }
 
 export default function SongList({
   songs,
+  loading,
   onSelect,
   onEdit,
   onDelete,
   onNew,
+  onLogout,
 }: Props) {
   return (
     <div className="flex flex-col h-screen bg-slate-900">
       {/* Header */}
-      <div className="px-4 py-4 border-b border-slate-700">
-        <h1 className="text-2xl font-black tracking-tight">Metronom</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Drummer's cue metronome
-        </p>
+      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Metronom</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Drummer's cue metronome
+          </p>
+        </div>
+        <button
+          onClick={onLogout}
+          className="text-sm text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800"
+        >
+          Log out
+        </button>
       </div>
 
       {/* Song list */}
       <div className="flex-1 overflow-y-auto">
-        {songs.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-slate-500">
+            Loading songs...
+          </div>
+        ) : songs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 px-8">
             <div className="text-5xl mb-4 opacity-40">🥁</div>
             <p className="text-center">

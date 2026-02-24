@@ -13,7 +13,7 @@ const TIME_SIGS: TimeSignature[] = ['4/4', '3/4', '6/8'];
 function defaultCueWords(ts: TimeSignature, sectionName: string): string[] {
   const n = getBeatsPerBar(ts);
   const words = [sectionName];
-  for (let i = 2; i <= n; i++) words.push(String(i));
+  for (let i = 1; i <= n; i++) words.push(String(i));
   return words;
 }
 
@@ -83,6 +83,21 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
     updateCue(sectionIdx, { words });
   };
 
+  const addCueBeat = (sectionIdx: number) => {
+    const s = sections[sectionIdx];
+    if (!s.cue) return;
+    const countBeats = s.cue.words.length - 1;
+    const words = [...s.cue.words, String(countBeats + 1)];
+    updateCue(sectionIdx, { words });
+  };
+
+  const removeCueBeat = (sectionIdx: number) => {
+    const s = sections[sectionIdx];
+    if (!s.cue || s.cue.words.length <= 1) return;
+    const words = s.cue.words.slice(0, -1);
+    updateCue(sectionIdx, { words });
+  };
+
   const addSection = () => {
     setSections([...sections, emptySection()]);
   };
@@ -123,8 +138,8 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
 
     const finalSections = sections.map((s) => {
       if (s.cue) {
-        const words = s.cue.words.slice(0, beatsPerBar);
-        while (words.length < beatsPerBar) words.push(String(words.length + 1));
+        const words = [...s.cue.words];
+        if (words.length === 0) words.push('Next');
         return { ...s, cue: { ...s.cue, words } };
       }
       return s;
@@ -367,20 +382,53 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                             />
                           </div>
 
-                          <label className="block text-xs text-slate-500 mb-1">
-                            Cue words (one per beat)
-                          </label>
-                          <div className="flex gap-2 flex-wrap">
-                            {Array.from({ length: beatsPerBar }).map((_, wi) => (
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs text-slate-500">
+                              Voice cue + beat counts
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => removeCueBeat(idx)}
+                                disabled={section.cue!.words.length <= 1}
+                                className="w-7 h-7 rounded-md bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600 disabled:opacity-30 text-sm font-bold flex items-center justify-center"
+                              >
+                                −
+                              </button>
+                              <span className="text-xs text-slate-500 w-16 text-center">
+                                {section.cue!.words.length - 1} beats
+                              </span>
+                              <button
+                                onClick={() => addCueBeat(idx)}
+                                className="w-7 h-7 rounded-md bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600 text-sm font-bold flex items-center justify-center"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-wrap items-end">
+                            <div>
+                              <span className="block text-[10px] text-amber-500/70 mb-0.5 text-center">Voice</span>
                               <input
-                                key={wi}
-                                className={`${inputClass} w-20 text-center text-sm`}
-                                value={section.cue!.words[wi] ?? ''}
+                                className={`${inputClass} w-24 text-center text-sm border-amber-600/40`}
+                                value={section.cue!.words[0] ?? ''}
                                 onChange={(e) =>
-                                  updateCueWord(idx, wi, e.target.value)
+                                  updateCueWord(idx, 0, e.target.value)
                                 }
-                                placeholder={`Beat ${wi + 1}`}
+                                placeholder="e.g. Chorus"
                               />
+                            </div>
+                            {section.cue!.words.slice(1).map((word, bi) => (
+                              <div key={bi}>
+                                <span className="block text-[10px] text-slate-600 mb-0.5 text-center">Beat {bi + 1}</span>
+                                <input
+                                  className={`${inputClass} w-16 text-center text-sm`}
+                                  value={word}
+                                  onChange={(e) =>
+                                    updateCueWord(idx, bi + 1, e.target.value)
+                                  }
+                                  placeholder={String(bi + 1)}
+                                />
+                              </div>
                             ))}
                           </div>
                         </div>

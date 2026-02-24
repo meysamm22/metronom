@@ -84,9 +84,18 @@ export class AudioEngine {
     const accents = getAccentBeats(ts);
     const isAccent = accents.includes(this.beatInBar);
 
+    const beatsPerBar = getBeatsPerBar(ts);
     let cueWord: string | undefined;
-    if (section.cue && this.barInSection + 1 === section.cue.bar) {
-      cueWord = section.cue.words[this.beatInBar];
+
+    if (section.cue) {
+      const cueBar0 = section.cue.bar - 1;
+      const prevBar0 = cueBar0 - 1;
+
+      if (prevBar0 >= 0 && this.barInSection === prevBar0 && this.beatInBar === beatsPerBar - 1) {
+        cueWord = section.cue.words[0];
+      } else if (this.barInSection === cueBar0) {
+        cueWord = section.cue.words[this.beatInBar + 1];
+      }
     }
 
     this.scheduleClick(time, isAccent);
@@ -102,7 +111,7 @@ export class AudioEngine {
       bar: this.barInSection + 1,
       totalBars: section.bars,
       beat: this.beatInBar + 1,
-      totalBeats: getBeatsPerBar(ts),
+      totalBeats: beatsPerBar,
       isAccent,
       cueWord,
     };
