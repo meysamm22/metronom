@@ -31,8 +31,6 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [reversedOrder, setReversedOrder] = useState(false);
 
-  const beatsPerBar = getBeatsPerBar(ts);
-
   const toggleCollapse = (idx: number) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
