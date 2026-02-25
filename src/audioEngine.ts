@@ -22,6 +22,7 @@ export class AudioEngine {
   private song: Song | null = null;
   private onBeat: BeatCallback | null = null;
   private onFinish: FinishCallback | null = null;
+  private speechUnlocked = false;
 
   private readonly SCHEDULE_AHEAD = 0.1;
   private readonly LOOKAHEAD_MS = 25;
@@ -35,6 +36,22 @@ export class AudioEngine {
     this.onFinish = onFinish;
   }
 
+  /**
+   * iOS requires speechSynthesis.speak() to be called directly from a user
+   * gesture at least once. Call this from the play button's click handler
+   * before starting the engine.
+   */
+  private warmUpSpeech() {
+    if (this.speechUnlocked) return;
+    if (typeof speechSynthesis === 'undefined') return;
+
+    const utt = new SpeechSynthesisUtterance('');
+    utt.volume = 0;
+    utt.rate = 10;
+    speechSynthesis.speak(utt);
+    this.speechUnlocked = true;
+  }
+
   start(song: Song) {
     this.stop();
     this.song = song;
@@ -43,6 +60,7 @@ export class AudioEngine {
       this.ctx = new AudioContext();
     }
     this.ctx.resume();
+    this.warmUpSpeech();
 
     this.sectionIdx = 0;
     this.barInSection = 0;
@@ -86,6 +104,7 @@ export class AudioEngine {
 
     const beatsPerBar = getBeatsPerBar(ts);
     let cueWord: string | undefined;
+    let isCueVoice = false;
 
     if (section.cue) {
       const cueBar0 = section.cue.bar - 1;
@@ -93,6 +112,7 @@ export class AudioEngine {
 
       if (prevBar0 >= 0 && this.barInSection === prevBar0 && this.beatInBar === beatsPerBar - 1) {
         cueWord = section.cue.words[0];
+        isCueVoice = true;
       } else if (this.barInSection === cueBar0) {
         cueWord = section.cue.words[this.beatInBar + 1];
       }
@@ -101,7 +121,7 @@ export class AudioEngine {
     this.scheduleClick(time, isAccent);
 
     if (cueWord) {
-      this.scheduleCueTone(time);
+      this.scheduleCueTone(time, isCueVoice);
       this.scheduleSpeech(cueWord, time);
     }
 
@@ -146,19 +166,34 @@ export class AudioEngine {
     }
   }
 
-  private scheduleCueTone(time: number) {
+  /**
+   * Play a distinctive cue tone via Web Audio (always works, even on iOS).
+   * Voice announcement gets a longer, lower tone. Count beats get a short chirp.
+   */
+  private scheduleCueTone(time: number, isVoice: boolean) {
+    if (!this.ctx) return;
+
+    if (isVoice) {
+      this.playTone(time, 330, 'triangle', 0.5, 0.18);
+      this.playTone(time + 0.06, 440, 'triangle', 0.4, 0.12);
+    } else {
+      this.playTone(time, 523, 'triangle', 0.4, 0.08);
+    }
+  }
+
+  private playTone(time: number, freq: number, type: OscillatorType, vol: number, dur: number) {
     if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.connect(gain);
     gain.connect(this.ctx.destination);
 
-    osc.frequency.value = 440;
-    osc.type = 'triangle';
-    gain.gain.setValueAtTime(0.5, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+    osc.frequency.value = freq;
+    osc.type = type;
+    gain.gain.setValueAtTime(vol, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
     osc.start(time);
-    osc.stop(time + 0.12);
+    osc.stop(time + dur);
   }
 
   private scheduleSpeech(word: string, time: number) {
@@ -166,6 +201,7 @@ export class AudioEngine {
     const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
     setTimeout(() => {
       if (!this._isPlaying) return;
+      speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(word);
       utt.rate = 1.8;
       utt.pitch = 1.1;
