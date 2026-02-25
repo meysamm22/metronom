@@ -156,14 +156,24 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * speechSynthesis has ~100-300ms processing latency before audio comes out.
+   * We fire it ahead of the beat to compensate so the voice lands closer to
+   * the click. The SPEECH_LEAD_MS value is tuned for typical mobile devices.
+   */
+  private static readonly SPEECH_LEAD_MS = 200;
+
   private scheduleSpeech(word: string, time: number) {
     if (!this.ctx || typeof speechSynthesis === 'undefined') return;
-    const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
+    const delayMs = Math.max(
+      0,
+      (time - this.ctx.currentTime) * 1000 - AudioEngine.SPEECH_LEAD_MS
+    );
     setTimeout(() => {
       if (!this._isPlaying) return;
       speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(word);
-      utt.rate = 1.2;
+      utt.rate = 1.3;
       utt.pitch = 1.0;
       utt.volume = 1;
       speechSynthesis.speak(utt);
