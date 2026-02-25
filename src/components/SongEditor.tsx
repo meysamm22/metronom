@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Song, Section, TimeSignature, CueConfig } from '../types';
 import { getBeatsPerBar, generateId } from '../types';
+import { SECTION_NAMES, CUE_WORDS } from '../cueAudio';
 
 interface Props {
   song?: Song;
@@ -10,10 +11,10 @@ interface Props {
 
 const TIME_SIGS: TimeSignature[] = ['4/4', '3/4', '6/8'];
 
-function defaultCueWords(ts: TimeSignature, sectionName: string): string[] {
+function defaultCueWords(ts: TimeSignature): string[] {
   const n = getBeatsPerBar(ts);
-  const words = [sectionName];
-  for (let i = 2; i <= n; i++) words.push(String(i));
+  const words: string[] = ['verse'];
+  for (let i = 2; i <= n; i++) words.push(String(Math.min(i, 6)));
   return words;
 }
 
@@ -61,7 +62,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
       updateSection(idx, {
         cue: {
           bar: s.bars,
-          words: defaultCueWords(ts, s.name || 'Next'),
+          words: defaultCueWords(ts),
         },
       });
     }
@@ -84,8 +85,8 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
   const addCueBeat = (sectionIdx: number) => {
     const s = sections[sectionIdx];
     if (!s.cue) return;
-    const countBeats = s.cue.words.length - 1;
-    const words = [...s.cue.words, String(countBeats + 1)];
+    const nextNum = Math.min(s.cue.words.length, 6);
+    const words = [...s.cue.words, String(nextNum)];
     updateCue(sectionIdx, { words });
   };
 
@@ -406,26 +407,36 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                           <div className="flex gap-2 flex-wrap items-end">
                             <div>
                               <span className="block text-[10px] text-amber-500/70 mb-0.5 text-center">Voice</span>
-                              <input
-                                className={`${inputClass} w-24 text-center text-sm border-amber-600/40`}
-                                value={section.cue!.words[0] ?? ''}
+                              <select
+                                className={`${inputClass} w-28 text-center text-sm border-amber-600/40`}
+                                value={section.cue!.words[0] ?? 'verse'}
                                 onChange={(e) =>
                                   updateCueWord(idx, 0, e.target.value)
                                 }
-                                placeholder="e.g. Chorus"
-                              />
+                              >
+                                {SECTION_NAMES.map((w) => (
+                                  <option key={w} value={w}>
+                                    {w}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             {section.cue!.words.slice(1).map((word, bi) => (
                               <div key={bi}>
                                 <span className="block text-[10px] text-slate-600 mb-0.5 text-center">Beat {bi + 2}</span>
-                                <input
+                                <select
                                   className={`${inputClass} w-16 text-center text-sm`}
                                   value={word}
                                   onChange={(e) =>
                                     updateCueWord(idx, bi + 1, e.target.value)
                                   }
-                                  placeholder={String(bi + 2)}
-                                />
+                                >
+                                  {CUE_WORDS.map((w) => (
+                                    <option key={w} value={w}>
+                                      {w}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                             ))}
                           </div>

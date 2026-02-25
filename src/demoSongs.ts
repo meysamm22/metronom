@@ -11,17 +11,17 @@ export const demoSongs: Song[] = [
       {
         name: 'Count-in',
         bars: 2,
-        cue: { bar: 2, words: ['Verse', '2', '3', '4'] },
+        cue: { bar: 2, words: ['verse', '2', '3', '4'] },
       },
       {
         name: 'Verse 1',
         bars: 8,
-        cue: { bar: 8, words: ['Chorus', '2', '3', '4'] },
+        cue: { bar: 8, words: ['chorus', '2', '3', '4'] },
       },
       {
         name: 'Chorus',
         bars: 4,
-        cue: { bar: 4, words: ['Bridge', '2', '3', '4'] },
+        cue: { bar: 4, words: ['bridge', '2', '3', '4'] },
       },
       {
         name: 'Bridge',
@@ -38,7 +38,7 @@ export const demoSongs: Song[] = [
       {
         name: 'Intro',
         bars: 2,
-        cue: { bar: 2, words: ['Melody', '2', '3'] },
+        cue: { bar: 2, words: ['melody', '2', '3'] },
       },
       {
         name: 'Melody',
@@ -55,7 +55,7 @@ export const demoSongs: Song[] = [
       {
         name: 'Intro',
         bars: 2,
-        cue: { bar: 2, words: ['Main', '2', '3', '4', '5', '6'] },
+        cue: { bar: 2, words: ['verse', '2', '3', '4', '5', '6'] },
       },
       {
         name: 'Main Groove',
