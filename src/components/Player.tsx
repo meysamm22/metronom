@@ -38,7 +38,7 @@ export default function Player({ song, onBack }: Props) {
     engineRef.current?.setCallbacks(handleBeat, handleFinish);
   }, [handleBeat, handleFinish]);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -48,8 +48,8 @@ export default function Player({ song, onBack }: Props) {
       setBeatInfo(null);
     } else {
       setFinished(false);
-      engine.start(song);
       setPlaying(true);
+      await engine.start(song);
     }
   };
 
