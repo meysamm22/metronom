@@ -104,7 +104,6 @@ export class AudioEngine {
 
     const beatsPerBar = getBeatsPerBar(ts);
     let cueWord: string | undefined;
-    let isCueVoice = false;
 
     if (section.cue) {
       const cueBar0 = section.cue.bar - 1;
@@ -112,7 +111,6 @@ export class AudioEngine {
 
       if (prevBar0 >= 0 && this.barInSection === prevBar0 && this.beatInBar === beatsPerBar - 1) {
         cueWord = section.cue.words[0];
-        isCueVoice = true;
       } else if (this.barInSection === cueBar0) {
         cueWord = section.cue.words[this.beatInBar + 1];
       }
@@ -121,7 +119,6 @@ export class AudioEngine {
     this.scheduleClick(time, isAccent);
 
     if (cueWord) {
-      this.scheduleCueTone(time, isCueVoice);
       this.scheduleSpeech(cueWord, time);
     }
 
@@ -166,36 +163,6 @@ export class AudioEngine {
     }
   }
 
-  /**
-   * Play a distinctive cue tone via Web Audio (always works, even on iOS).
-   * Voice announcement gets a longer, lower tone. Count beats get a short chirp.
-   */
-  private scheduleCueTone(time: number, isVoice: boolean) {
-    if (!this.ctx) return;
-
-    if (isVoice) {
-      this.playTone(time, 330, 'triangle', 0.5, 0.18);
-      this.playTone(time + 0.06, 440, 'triangle', 0.4, 0.12);
-    } else {
-      this.playTone(time, 523, 'triangle', 0.4, 0.08);
-    }
-  }
-
-  private playTone(time: number, freq: number, type: OscillatorType, vol: number, dur: number) {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.frequency.value = freq;
-    osc.type = type;
-    gain.gain.setValueAtTime(vol, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-    osc.start(time);
-    osc.stop(time + dur);
-  }
-
   private scheduleSpeech(word: string, time: number) {
     if (!this.ctx || typeof speechSynthesis === 'undefined') return;
     const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
@@ -203,8 +170,8 @@ export class AudioEngine {
       if (!this._isPlaying) return;
       speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(word);
-      utt.rate = 1.8;
-      utt.pitch = 1.1;
+      utt.rate = 1.2;
+      utt.pitch = 1.0;
       utt.volume = 1;
       speechSynthesis.speak(utt);
     }, delayMs);
