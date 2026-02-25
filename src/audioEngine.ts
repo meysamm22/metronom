@@ -105,15 +105,8 @@ export class AudioEngine {
     const beatsPerBar = getBeatsPerBar(ts);
     let cueWord: string | undefined;
 
-    if (section.cue) {
-      const cueBar0 = section.cue.bar - 1;
-      const prevBar0 = cueBar0 - 1;
-
-      if (prevBar0 >= 0 && this.barInSection === prevBar0 && this.beatInBar === beatsPerBar - 1) {
-        cueWord = section.cue.words[0];
-      } else if (this.barInSection === cueBar0) {
-        cueWord = section.cue.words[this.beatInBar + 1];
-      }
+    if (section.cue && this.barInSection + 1 === section.cue.bar) {
+      cueWord = section.cue.words[this.beatInBar];
     }
 
     this.scheduleClick(time, isAccent);

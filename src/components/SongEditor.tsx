@@ -13,7 +13,7 @@ const TIME_SIGS: TimeSignature[] = ['4/4', '3/4', '6/8'];
 function defaultCueWords(ts: TimeSignature, sectionName: string): string[] {
   const n = getBeatsPerBar(ts);
   const words = [sectionName];
-  for (let i = 1; i <= n; i++) words.push(String(i));
+  for (let i = 2; i <= n; i++) words.push(String(i));
   return words;
 }
 
@@ -417,14 +417,14 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                             </div>
                             {section.cue!.words.slice(1).map((word, bi) => (
                               <div key={bi}>
-                                <span className="block text-[10px] text-slate-600 mb-0.5 text-center">Beat {bi + 1}</span>
+                                <span className="block text-[10px] text-slate-600 mb-0.5 text-center">Beat {bi + 2}</span>
                                 <input
                                   className={`${inputClass} w-16 text-center text-sm`}
                                   value={word}
                                   onChange={(e) =>
                                     updateCueWord(idx, bi + 1, e.target.value)
                                   }
-                                  placeholder={String(bi + 1)}
+                                  placeholder={String(bi + 2)}
                                 />
                               </div>
                             ))}
