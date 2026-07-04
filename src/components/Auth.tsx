@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
 
-export default function Auth() {
+interface Props {
+  onContinueOffline: () => void;
+}
+
+export default function Auth({ onContinueOffline }: Props) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +97,22 @@ export default function Auth() {
             ? 'Already have an account? Log in'
             : "Don't have an account? Sign up"}
         </button>
+
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-slate-800" />
+          <span className="text-xs text-slate-600">or</span>
+          <div className="flex-1 h-px bg-slate-800" />
+        </div>
+
+        <button
+          onClick={onContinueOffline}
+          className="w-full py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 font-medium transition-colors"
+        >
+          Continue offline
+        </button>
+        <p className="text-xs text-slate-600 text-center mt-2">
+          Songs stay on this device and sync when you log in later.
+        </p>
       </div>
     </div>
   );

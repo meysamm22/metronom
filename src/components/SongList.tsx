@@ -3,6 +3,7 @@ import type { Song } from '../types';
 interface Props {
   songs: Song[];
   loading: boolean;
+  signedIn: boolean;
   onSelect: (song: Song) => void;
   onEdit: (song: Song) => void;
   onDelete: (id: string) => void;
@@ -13,6 +14,7 @@ interface Props {
 export default function SongList({
   songs,
   loading,
+  signedIn,
   onSelect,
   onEdit,
   onDelete,
@@ -33,7 +35,7 @@ export default function SongList({
           onClick={onLogout}
           className="text-sm text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800"
         >
-          Log out
+          {signedIn ? 'Log out' : 'Log in'}
         </button>
       </div>
 

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { Song } from './types';
-import { supabase } from './supabase';
-import { loadSongs, saveSong, deleteSong as removeFromStore } from './store';
+import { supabase, isSupabaseConfigured } from './supabase';
+import {
+  loadSongs,
+  saveSong,
+  deleteSong as removeFromStore,
+  syncWithRemote,
+  clearLocalData,
+} from './store';
 import { demoSongs } from './demoSongs';
 import Auth from './components/Auth';
 import SongList from './components/SongList';
@@ -11,54 +17,86 @@ import Player from './components/Player';
 
 type View = 'list' | 'player' | 'editor';
 
+// Set once the user has either signed in or chosen to use the app offline.
+// Guarantees the app never locks the user out on stage when the network (and
+// therefore session refresh) is unavailable.
+const LOCAL_OK_KEY = 'metronom.localOk';
+const SEEDED_KEY = 'metronom.demosSeeded';
+
+function seedDemosIfNeeded(): void {
+  if (localStorage.getItem(SEEDED_KEY)) return;
+  if (loadSongs().length === 0) {
+    for (const s of demoSongs) {
+      saveSong(s);
+    }
+  }
+  localStorage.setItem(SEEDED_KEY, '1');
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
+  const [localOk, setLocalOk] = useState(
+    () => localStorage.getItem(LOCAL_OK_KEY) === '1'
+  );
   const [view, setView] = useState<View>('list');
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [songsLoading, setSongsLoading] = useState(true);
+  // Local store is synchronous: songs are available on first render, offline.
+  const [songs, setSongs] = useState<Song[]>(() => loadSongs());
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [editingSong, setEditingSong] = useState<Song | undefined>(undefined);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthReady(true);
-    });
+    if (!isSupabaseConfigured) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
+    const applySession = (session: Session | null) => {
+      setSession(session);
+      if (session) {
+        localStorage.setItem(LOCAL_OK_KEY, '1');
+        setLocalOk(true);
       }
-    );
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => applySession(session))
+      .catch(() => setSession(null))
+      .finally(() => setAuthReady(true));
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const refresh = useCallback(async () => {
-    setSongsLoading(true);
-    const songs = await loadSongs();
-    setSongs(songs);
-    setSongsLoading(false);
+  const refresh = useCallback(() => {
+    setSongs(loadSongs());
   }, []);
 
+  const sync = useCallback(async () => {
+    const remote = await syncWithRemote();
+    if (remote) setSongs(remote);
+  }, []);
+
+  // Initial sync + demo seeding, once auth state is known and the user is
+  // actually in the app (signed in or explicitly offline).
   useEffect(() => {
-    if (session) {
-      refresh().then(async (  ) => {
-        const current = await loadSongs();
-        if (current.length === 0) {
-          for (const s of demoSongs) {
-            await saveSong(s);
-          }
-          const withDemos = await loadSongs();
-          setSongs(withDemos);
-        }
-      });
-    } else {
-      setSongs([]);
-      setSongsLoading(false);
-    }
-  }, [session, refresh]);
+    if (!authReady || (!session && !localOk)) return;
+    (async () => {
+      await sync();
+      seedDemosIfNeeded();
+      refresh();
+    })();
+  }, [authReady, session, localOk, sync, refresh]);
+
+  // Re-sync whenever connectivity returns.
+  useEffect(() => {
+    const onOnline = () => void sync();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [sync]);
 
   const handleSelect = (song: Song) => {
     setSelectedSong(song);
@@ -75,14 +113,14 @@ export default function App() {
     setView('editor');
   };
 
-  const handleDelete = async (id: string) => {
-    await removeFromStore(id);
-    await refresh();
+  const handleDelete = (id: string) => {
+    removeFromStore(id);
+    refresh();
   };
 
-  const handleSave = async (song: Song) => {
-    await saveSong(song);
-    await refresh();
+  const handleSave = (song: Song) => {
+    saveSong(song);
+    refresh();
     setView('list');
   };
 
@@ -92,13 +130,30 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    if (session) {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Offline sign-out: clear local state anyway.
+      }
+      clearLocalData();
+      localStorage.removeItem(SEEDED_KEY);
+      setSongs([]);
+    }
+    localStorage.removeItem(LOCAL_OK_KEY);
+    setLocalOk(false);
+    setSession(null);
     setView('list');
     setSelectedSong(null);
     setEditingSong(undefined);
   };
 
-  if (!authReady) {
+  const handleContinueOffline = () => {
+    localStorage.setItem(LOCAL_OK_KEY, '1');
+    setLocalOk(true);
+  };
+
+  if (!authReady && !localOk) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-900 text-slate-500">
         Loading...
@@ -106,8 +161,8 @@ export default function App() {
     );
   }
 
-  if (!session) {
-    return <Auth />;
+  if (isSupabaseConfigured && !session && !localOk) {
+    return <Auth onContinueOffline={handleContinueOffline} />;
   }
 
   if (view === 'player' && selectedSong) {
@@ -127,7 +182,8 @@ export default function App() {
   return (
     <SongList
       songs={songs}
-      loading={songsLoading}
+      loading={false}
+      signedIn={!!session}
       onSelect={handleSelect}
       onEdit={handleEdit}
       onDelete={handleDelete}
