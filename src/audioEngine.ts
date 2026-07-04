@@ -1,6 +1,24 @@
+import { KeepAwake } from '@capacitor-community/keep-awake';
 import type { Song, BeatInfo } from './types';
 import { getBeatsPerBar, getAccentBeats } from './types';
 import { preloadAllCueBuffers, getCueBuffer } from './cueAudio';
+
+/**
+ * Safari 17+ / iOS WKWebView expose navigator.audioSession. Setting it to
+ * 'playback' makes Web Audio ignore the ring/silent switch and keeps the
+ * session alive with the screen locked.
+ */
+function requestPlaybackAudioSession(): void {
+  const nav = navigator as Navigator & { audioSession?: { type: string } };
+  if (nav.audioSession) {
+    try {
+      nav.audioSession.type = 'playback';
+    } catch {
+      // Older WebKit: property exists but is read-only. Native AVAudioSession
+      // config in the iOS app covers this case.
+    }
+  }
+}
 
 export type BeatCallback = (info: BeatInfo) => void;
 export type FinishCallback = () => void;
@@ -42,6 +60,11 @@ export class AudioEngine {
     this.stop();
     this.song = song;
 
+    requestPlaybackAudioSession();
+    // Never let the screen sleep mid-song: on iOS a locked screen suspends JS
+    // timers, which would silently stop the look-ahead scheduler.
+    KeepAwake.keepAwake().catch(() => {});
+
     if (!this.ctx) {
       this.ctx = new AudioContext();
     }
@@ -72,6 +95,7 @@ export class AudioEngine {
       window.clearInterval(this.timerID);
       this.timerID = null;
     }
+    KeepAwake.allowSleep().catch(() => {});
   }
 
   private async renderClick(freq: number, vol: number): Promise<AudioBuffer> {
@@ -171,6 +195,7 @@ export class AudioEngine {
             window.clearInterval(this.timerID);
             this.timerID = null;
           }
+          KeepAwake.allowSleep().catch(() => {});
           setTimeout(() => this.onFinish?.(), 100);
           return;
         }

@@ -1,3 +1,39 @@
+# Metronom
+
+Drummer's cue metronome with section-based playback. Runs as a web app (PWA) and as a native iOS/Android app via [Capacitor](https://capacitorjs.com/).
+
+## Mobile apps (Capacitor)
+
+The app is fully offline-capable: songs are stored on the device (localStorage) and sync to Supabase in the background when online. All click/cue audio ships inside the app binary.
+
+### Build for iOS (requires a Mac with Xcode)
+
+```bash
+npm install
+npm run ios   # builds the web app, syncs, and opens Xcode
+```
+
+In Xcode: select your signing team under Signing & Capabilities, then build/run on a device or archive for App Store submission. An Apple Developer account is required for device installs and App Store distribution.
+
+The iOS shell is preconfigured for live use:
+
+- `AVAudioSession` is set to the `playback` category (`AppDelegate.swift`), so the click ignores the ring/silent switch and can mix with backing tracks.
+- `UIBackgroundModes: audio` is enabled in `Info.plist`.
+- The screen is kept awake while a song is playing (keep-awake plugin), so the look-ahead scheduler is never suspended mid-song.
+
+### Build for Android
+
+```bash
+npm install
+npm run android   # builds the web app, syncs, and opens Android Studio
+```
+
+### Supabase configuration
+
+Create a `.env` file with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` before building. Without them the app still works in local-only mode (no account/sync).
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
