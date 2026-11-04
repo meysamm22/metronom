@@ -155,7 +155,7 @@ export default function App() {
 
   if (!authReady && !localOk) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-900 text-slate-500">
+      <div className="flex items-center justify-center h-full bg-slate-900 text-slate-500">
         Loading...
       </div>
     );

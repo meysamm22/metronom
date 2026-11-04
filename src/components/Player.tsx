@@ -56,7 +56,7 @@ export default function Player({ song, onBack }: Props) {
   const beatsPerBar = getBeatsPerBar(song.timeSignature);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900">
+    <div className="flex flex-col h-full bg-slate-900">
       {/* Header */}
       <div className="flex items-center px-4 py-3 border-b border-slate-700">
         <button

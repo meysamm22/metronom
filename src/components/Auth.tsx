@@ -39,7 +39,7 @@ export default function Auth({ onContinueOffline }: Props) {
     'w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none placeholder-slate-500';
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-900 px-6">
+    <div className="flex flex-col items-center justify-center h-full bg-slate-900 px-6">
       <div className="w-full max-w-sm">
         <h1 className="text-3xl font-black tracking-tight text-center mb-1">
           Metronom

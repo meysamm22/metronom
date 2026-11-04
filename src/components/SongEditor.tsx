@@ -167,7 +167,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
     'w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-indigo-500 focus:outline-none';
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 relative">
+    <div className="flex flex-col h-full bg-slate-900 relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
         <button onClick={onCancel} className="text-slate-400 hover:text-white">
@@ -458,7 +458,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
       {/* Floating Add Section button */}
       <button
         onClick={addSection}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-3xl font-light shadow-lg shadow-indigo-900/50 flex items-center justify-center transition-colors z-10"
+        className="fixed fab-safe w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-3xl font-light shadow-lg shadow-indigo-900/50 flex items-center justify-center transition-colors z-10"
         title="Add Section"
       >
         +
