@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import type { Song, BeatInfo } from './types';
 import { getBeatsPerBar, getAccentBeats } from './types';
@@ -20,6 +21,13 @@ function requestPlaybackAudioSession(): void {
   }
 }
 
+/**
+ * Android's audio path adds a large, device-dependent delay between scheduling
+ * a sound and hearing it (~30-150 ms on phones, far more on Bluetooth or the
+ * emulator). iOS is ~5-10 ms, so it is left uncompensated.
+ */
+const COMPENSATE_OUTPUT_LATENCY = Capacitor.getPlatform() === 'android';
+
 export type BeatCallback = (info: BeatInfo) => void;
 export type FinishCallback = () => void;
 
@@ -37,6 +45,8 @@ export class AudioEngine {
   private beatInBar = 0;
   private timerID: number | null = null;
   private _isPlaying = false;
+  /** Bumped on stop so UI callbacks from an earlier run are dropped. */
+  private runId = 0;
   private song: Song | null = null;
   private onBeat: BeatCallback | null = null;
   private onFinish: FinishCallback | null = null;
@@ -91,6 +101,7 @@ export class AudioEngine {
 
   stop() {
     this._isPlaying = false;
+    this.runId++;
     if (this.timerID !== null) {
       window.clearInterval(this.timerID);
       this.timerID = null;
@@ -160,10 +171,26 @@ export class AudioEngine {
       cueWord,
     };
 
-    const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
+    // Fire the UI when the click is *heard*, not when it is scheduled.
+    const run = this.runId;
+    const delayMs = Math.max(
+      0,
+      (time - this.ctx.currentTime + this.outputDelay()) * 1000
+    );
     setTimeout(() => {
-      if (this._isPlaying) this.onBeat?.(beatInfo);
+      if (this.runId === run) this.onBeat?.(beatInfo);
     }, delayMs);
+  }
+
+  /**
+   * Seconds between ctx.currentTime and the sound reaching the speaker. Read
+   * live on every beat so it follows route changes (e.g. Bluetooth headphones).
+   */
+  private outputDelay(): number {
+    if (!COMPENSATE_OUTPUT_LATENCY || !this.ctx) return 0;
+    const ctx = this.ctx as AudioContext & { outputLatency?: number };
+    const total = (ctx.baseLatency || 0) + (ctx.outputLatency || 0);
+    return Number.isFinite(total) ? Math.min(Math.max(total, 0), 1) : 0;
   }
 
   private playBuffer(buffer: AudioBuffer | null, time: number, volume: number) {
@@ -196,7 +223,10 @@ export class AudioEngine {
             this.timerID = null;
           }
           KeepAwake.allowSleep().catch(() => {});
-          setTimeout(() => this.onFinish?.(), 100);
+          const run = this.runId;
+          setTimeout(() => {
+            if (this.runId === run) this.onFinish?.();
+          }, 100 + this.outputDelay() * 1000);
           return;
         }
       }
