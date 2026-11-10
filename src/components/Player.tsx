@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine } from '../audioEngine';
 import type { BeatInfo, Song } from '../types';
-import { getBeatsPerBar } from '../types';
+import { getBeatsPerBar, getAccentBeats } from '../types';
 
 interface Props {
   song: Song;
@@ -54,6 +54,12 @@ export default function Player({ song, onBack }: Props) {
   };
 
   const beatsPerBar = getBeatsPerBar(song.timeSignature);
+  const accents = getAccentBeats(song.timeSignature);
+  // 7+ dots don't fit a phone width at full size; 10+ need smaller still.
+  const dotSize =
+    beatsPerBar > 9 ? 'w-6 h-6 text-[10px]' : beatsPerBar > 6 ? 'w-7 h-7 text-xs' : 'w-10 h-10 text-sm';
+  const dotGap = beatsPerBar > 9 ? 'gap-1' : beatsPerBar > 6 ? 'gap-1.5' : 'gap-3';
+  const groupGap = beatsPerBar > 6 ? 'ml-1.5' : 'ml-3';
 
   return (
     <div className="flex flex-col h-full bg-slate-900">
@@ -121,14 +127,20 @@ export default function Player({ song, onBack }: Props) {
             </div>
 
             {/* Beat dots */}
-            <div className="flex gap-3 mb-8" key={`dots-${beatInfo.sectionIndex}-${beatInfo.bar}`}>
+            <div
+              className={`flex mb-8 ${dotGap}`}
+              key={`dots-${beatInfo.sectionIndex}-${beatInfo.bar}`}
+            >
               {Array.from({ length: beatsPerBar }).map((_, i) => {
                 const isCurrentBeat = beatInfo.beat === i + 1;
                 const isCueBeat = !!beatInfo.cueWord && isCurrentBeat;
                 return (
                   <div
                     key={i}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-75 ${
+                    className={`${dotSize} ${
+                      // Extra space before each group start shows 2+2+3 etc.
+                      i > 0 && accents.includes(i) && accents.length > 1 ? groupGap : ''
+                    } rounded-full flex items-center justify-center font-bold transition-all duration-75 ${
                       isCurrentBeat
                         ? isCueBeat
                           ? 'bg-amber-500 text-black scale-125'

@@ -60,3 +60,29 @@ input, select, textarea {
 .beat-pulse {
   animation: pulse-beat 0.15s ease-out;
 }
+
+/* Tempo slider: thick track, big thumb for touch. */
+.bpm-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  background: #334155;
+  outline: none;
+}
+.bpm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: #6366f1;
+  border: 3px solid #e2e8f0;
+}
+.bpm-slider::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: #6366f1;
+  border: 3px solid #e2e8f0;
+}

@@ -1,21 +1,19 @@
 import { useState } from 'react';
 import type { Song, Section, TimeSignature, CueConfig } from '../types';
-import { getBeatsPerBar, generateId } from '../types';
+import {
+  getBeatsPerBar,
+  generateId,
+  defaultCueWords,
+  SILENT_CUE,
+} from '../types';
 import { SECTION_NAMES, CUE_WORDS } from '../cueAudio';
+import BpmControl from './BpmControl';
+import TimeSignaturePicker from './TimeSignaturePicker';
 
 interface Props {
   song?: Song;
   onSave: (song: Song) => void;
   onCancel: () => void;
-}
-
-const TIME_SIGS: TimeSignature[] = ['4/4', '3/4', '6/8'];
-
-function defaultCueWords(ts: TimeSignature): string[] {
-  const n = getBeatsPerBar(ts);
-  const words: string[] = ['verse'];
-  for (let i = 2; i <= n; i++) words.push(String(Math.min(i, 6)));
-  return words;
 }
 
 function emptySection(): Section {
@@ -58,6 +56,23 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
     );
   };
 
+  // Cue words are per beat, so a new meter needs new counts. Keep each
+  // section's chosen voice word; rebuild the counts for the new bar length.
+  const changeTimeSignature = (next: TimeSignature) => {
+    if (next === ts) return;
+    setTs(next);
+    setSections((prev) =>
+      prev.map((s) => {
+        if (!s.cue) return s;
+        const voice =
+          s.cue.words[0] && s.cue.words[0] !== SILENT_CUE
+            ? s.cue.words[0]
+            : 'verse';
+        return { ...s, cue: { ...s.cue, words: defaultCueWords(next, voice) } };
+      })
+    );
+  };
+
   const toggleCue = (idx: number) => {
     const s = sections[idx];
     if (s.cue) {
@@ -89,8 +104,9 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
   const addCueBeat = (sectionIdx: number) => {
     const s = sections[sectionIdx];
     if (!s.cue) return;
-    const nextNum = Math.min(s.cue.words.length, 6);
-    const words = [...s.cue.words, String(nextNum)];
+    if (s.cue.words.length >= getBeatsPerBar(ts)) return;
+    const next = s.cue.words.length + 1;
+    const words = [...s.cue.words, next <= 6 ? String(next) : SILENT_CUE];
     updateCue(sectionIdx, { words });
   };
 
@@ -197,34 +213,20 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
           />
         </div>
 
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <label className="block text-sm text-slate-400 mb-1">BPM</label>
-            <input
-              type="number"
-              className={inputClass}
-              value={bpm}
-              min={20}
-              max={300}
-              onChange={(e) => setBpm(Number(e.target.value) || 120)}
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm text-slate-400 mb-1">
-              Time Signature
-            </label>
-            <select
-              className={inputClass}
-              value={ts}
-              onChange={(e) => setTs(e.target.value as TimeSignature)}
-            >
-              {TIME_SIGS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="block text-sm text-slate-400 mb-1">Tempo</label>
+          <BpmControl
+            value={bpm}
+            onChange={setBpm}
+            unitHint={ts.endsWith('/8') ? 'eighth notes' : undefined}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-slate-400 mb-1">
+            Time Signature
+          </label>
+          <TimeSignaturePicker value={ts} onChange={changeTimeSignature} />
         </div>
 
         {/* Sections header with controls */}
@@ -435,6 +437,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                                     updateCueWord(idx, bi + 1, e.target.value)
                                   }
                                 >
+                                  <option value={SILENT_CUE}>—</option>
                                   {CUE_WORDS.map((w) => (
                                     <option key={w} value={w}>
                                       {w}

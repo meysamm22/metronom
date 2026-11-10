@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import type { Song, BeatInfo } from './types';
-import { getBeatsPerBar, getAccentBeats } from './types';
+import { getBeatsPerBar, getAccentBeats, SILENT_CUE } from './types';
 import { preloadAllCueBuffers, getCueBuffer } from './cueAudio';
 
 /**
@@ -149,6 +149,7 @@ export class AudioEngine {
     let cueWord: string | undefined;
     if (section.cue && this.barInSection + 1 === section.cue.bar) {
       cueWord = section.cue.words[this.beatInBar];
+      if (cueWord === SILENT_CUE) cueWord = undefined;
     }
 
     this.playBuffer(isAccent ? this.clickAccentBuf : this.clickNormalBuf, time, 1.0);
