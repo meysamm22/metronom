@@ -28,6 +28,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.4.1",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.0",

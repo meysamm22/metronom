@@ -12,16 +12,19 @@ export function SegnoMark({ className = '' }: { className?: string }) {
       strokeLinecap="round"
       aria-hidden
     >
-      {/* the S */}
+      {/* Same geometry as the app icon (assets/build-icons.mjs). The S
+          leans and is wider than a letter S, and the slash is long and
+          shallow, so the sign doesn't read as "$". */}
       <path
-        d="M22.5 8.8c-1.4-3-6.6-4-9.2-1.4-2.6 2.7.1 5.4 3.6 7 3.5 1.6 6.9 4 4.6 7.8-2 3.3-7.9 3.1-10-.2"
-        strokeWidth={2.7}
+        d="M24.6 10.2C25.4 6.4 20.6 4.4 16.8 4.6 12.6 4.8 10.4 7.8 11.6 10.6 12.8 13.4 17.2 14.6 19.6 16.2 22.4 18 22.6 21.6 20.6 23.6 18.6 25.6 13.2 26.2 10.2 24.2 8.6 23 7.8 22.2 7.4 21.6"
+        transform="translate(16 16) rotate(-10) scale(1.14 0.85) translate(-16 -16)"
+        strokeWidth={2.6}
       />
       {/* the slash */}
-      <path d="M7 27.5 25 4.5" strokeWidth={1.7} />
-      {/* the dots, in the quadrants the slash leaves open */}
-      <circle cx={5.6} cy={12.8} r={2.1} fill="currentColor" stroke="none" />
-      <circle cx={26.4} cy={19.2} r={2.1} fill="currentColor" stroke="none" />
+      <path d="M4 25.5 28 6.5" strokeWidth={1.8} />
+      {/* a dot either side */}
+      <circle cx={3.4} cy={14.6} r={2.3} fill="currentColor" stroke="none" />
+      <circle cx={28.6} cy={17.4} r={2.3} fill="currentColor" stroke="none" />
     </svg>
   );
 }
