@@ -12,10 +12,28 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 const SONGS_KEY = 'metronom.songs.v1';
 const PENDING_KEY = 'metronom.pending.v1';
+/**
+ * User's manual song order (list of ids). Kept apart from the song list
+ * because remote sync replaces that list wholesale. Synced to the
+ * songs.position column when signed in.
+ */
+const ORDER_KEY = 'metronom.order.v1';
 
 type PendingOp =
   | { type: 'upsert'; song: Song }
-  | { type: 'delete'; id: string };
+  | { type: 'delete'; id: string }
+  // The order to push is read at push time, so one queued op covers any
+  // number of reorders. `at` makes each reorder a distinct op (see sync).
+  | { type: 'order'; at: number };
+
+/** Ops with the same key replace each other in the queue. */
+function opKey(op: PendingOp): string {
+  if (op.type === 'order') return '__order__';
+  return op.type === 'upsert' ? op.song.id : op.id;
+}
+
+const sameOp = (a: PendingOp, b: PendingOp) =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 interface SongRow {
   id: string;
@@ -24,6 +42,7 @@ interface SongRow {
   bpm: number;
   time_signature: string;
   sections: Section[];
+  position?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,24 +92,38 @@ function setPending(ops: PendingOp[]): void {
   writeJson(PENDING_KEY, ops);
 }
 
-/** Queue an op, replacing any earlier op for the same song id. */
+/** Queue an op, replacing any earlier op with the same key. */
 function enqueue(op: PendingOp): void {
-  const id = op.type === 'upsert' ? op.song.id : op.id;
-  const rest = getPending().filter(
-    (p) => (p.type === 'upsert' ? p.song.id : p.id) !== id
-  );
-  setPending([...rest, op]);
+  const key = opKey(op);
+  setPending([...getPending().filter((p) => opKey(p) !== key), op]);
 }
 
 export function clearLocalData(): void {
   localStorage.removeItem(SONGS_KEY);
   localStorage.removeItem(PENDING_KEY);
+  localStorage.removeItem(ORDER_KEY);
+}
+
+/** Songs in the user's order; ones not yet placed keep their order at the end. */
+function applyOrder(songs: Song[]): Song[] {
+  const order = readJson<string[]>(ORDER_KEY, []);
+  const rank = new Map(order.map((id, i) => [id, i]));
+  return songs
+    .map((song, i) => ({ song, key: rank.get(song.id) ?? order.length + i }))
+    .sort((a, b) => a.key - b.key)
+    .map((x) => x.song);
+}
+
+export function saveSongOrder(ids: string[]): void {
+  writeJson(ORDER_KEY, ids);
+  enqueue({ type: 'order', at: Date.now() });
+  void syncWithRemote();
 }
 
 // ---------- Public API (local-first) ----------
 
 export function loadSongs(): Song[] {
-  return loadLocalSongs();
+  return applyOrder(loadLocalSongs());
 }
 
 export function saveSong(song: Song): void {
@@ -112,6 +145,8 @@ export function deleteSong(id: string): void {
 // ---------- Remote sync ----------
 
 let syncing = false;
+/** A sync was requested while one was running; run once more after it. */
+let rerun = false;
 
 /**
  * Push queued offline changes to Supabase, then pull the remote list into the
@@ -119,7 +154,11 @@ let syncing = false;
  * possible (offline, not configured, not signed in, or already running).
  */
 export async function syncWithRemote(): Promise<Song[] | null> {
-  if (!isSupabaseConfigured || syncing) return null;
+  if (!isSupabaseConfigured) return null;
+  if (syncing) {
+    rerun = true;
+    return null;
+  }
   if (typeof navigator !== 'undefined' && !navigator.onLine) return null;
 
   syncing = true;
@@ -130,9 +169,8 @@ export async function syncWithRemote(): Promise<Song[] | null> {
     if (!user) return null;
 
     // Push queued local changes first so they win over stale remote rows.
-    const pending = getPending();
-    for (let i = 0; i < pending.length; i++) {
-      const op = pending[i];
+    for (const op of getPending()) {
+      let done = true;
       if (op.type === 'upsert') {
         const { error } = await supabase.from('songs').upsert({
           id: op.song.id,
@@ -144,27 +182,71 @@ export async function syncWithRemote(): Promise<Song[] | null> {
           updated_at: new Date().toISOString(),
         });
         if (error) throw error;
-      } else {
+      } else if (op.type === 'delete') {
         const { error } = await supabase.from('songs').delete().eq('id', op.id);
         if (error) throw error;
+      } else {
+        const ids = applyOrder(loadLocalSongs()).map((s) => s.id);
+        const { error } = await supabase.rpc('set_song_order', {
+          song_ids: ids,
+        });
+        if (error?.code === 'PGRST202') {
+          // Database not migrated yet: keep the op for later, and don't let
+          // it block syncing songs.
+          done = false;
+        } else if (error) {
+          throw error;
+        }
       }
-      // Drop each op as it lands so a mid-sync failure retries only the rest.
-      setPending(pending.slice(i + 1));
+      // Drop each op as it lands so a mid-sync failure retries only the
+      // rest. Re-read the queue: if the same song was edited (or the list
+      // reordered) while this request was in flight, the newer op replaced
+      // this one and must stay.
+      if (done) setPending(getPending().filter((p) => !sameOp(p, op)));
     }
 
-    const { data, error } = await supabase
+    let positionSynced = true;
+    let { data, error } = await supabase
       .from('songs')
       .select('*')
+      .order('position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
+    if (error?.code === '42703') {
+      // No position column yet (database not migrated).
+      positionSynced = false;
+      ({ data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .order('created_at', { ascending: true }));
+    }
     if (error) throw error;
 
-    const songs = (data as SongRow[]).map(rowToSong);
+    const rows = (data ?? []) as SongRow[];
+    // Adopt the server's order unless a local reorder is still waiting to be
+    // pushed, or nobody has ever ordered the list there.
+    const orderPending = getPending().some((p) => p.type === 'order');
+    if (
+      positionSynced &&
+      !orderPending &&
+      rows.some((r) => r.position !== null && r.position !== undefined)
+    ) {
+      writeJson(
+        ORDER_KEY,
+        rows.map((r) => r.id)
+      );
+    }
+
+    const songs = rows.map(rowToSong);
     saveLocalSongs(songs);
-    return songs;
+    return applyOrder(songs);
   } catch (e) {
     console.warn('Sync with Supabase failed (will retry later):', e);
     return null;
   } finally {
     syncing = false;
+    if (rerun) {
+      rerun = false;
+      setTimeout(() => void syncWithRemote(), 0);
+    }
   }
 }

@@ -1,6 +1,27 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  restrictToParentElement,
+  restrictToVerticalAxis,
+} from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import type { Song } from '../types';
 
-// Inline SVG so both icons render at exactly the same size on iOS and Android
+// Inline SVG so icons render at exactly the same size on iOS and Android
 // (the old ✎ glyph and 🗑 emoji came from different fonts).
 const iconProps = {
   width: 22,
@@ -30,6 +51,14 @@ const TrashIcon = () => (
   </svg>
 );
 
+const GripIcon = () => (
+  <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    {[6, 12, 18].map((y) =>
+      [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r={1.6} />)
+    )}
+  </svg>
+);
+
 interface Props {
   songs: Song[];
   loading: boolean;
@@ -37,8 +66,88 @@ interface Props {
   onSelect: (song: Song) => void;
   onEdit: (song: Song) => void;
   onDelete: (id: string) => void;
+  onReorder: (songs: Song[]) => void;
   onNew: () => void;
   onLogout: () => void;
+}
+
+interface RowProps {
+  song: Song;
+  onSelect: (song: Song) => void;
+  onEdit: (song: Song) => void;
+  onDelete: (id: string) => void;
+}
+
+function SongRow({ song, onSelect, onEdit, onDelete }: RowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: song.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+      }}
+      className={`relative flex items-center pr-4 py-3 border-b border-slate-800 bg-slate-900 ${
+        isDragging
+          ? 'z-10 bg-slate-800 shadow-2xl shadow-black/60 rounded-xl border-transparent'
+          : 'active:bg-slate-800'
+      }`}
+    >
+      {/* Drag handle: only this starts a drag, so the list still scrolls. */}
+      <button
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        className={`self-stretch flex items-center pl-3 pr-2 touch-none cursor-grab ${
+          isDragging ? 'text-indigo-400 cursor-grabbing' : 'text-slate-600'
+        }`}
+        aria-label={`Reorder ${song.name}`}
+      >
+        <GripIcon />
+      </button>
+
+      <button
+        onClick={() => onSelect(song)}
+        className="flex-1 text-left min-w-0"
+      >
+        <div className="font-semibold truncate">{song.name}</div>
+        <div className="text-sm text-slate-500 mt-0.5">
+          {song.bpm} BPM · {song.timeSignature} · {song.sections.length}{' '}
+          sections · {song.sections.reduce((a, s) => a + s.bars, 0)} bars
+        </div>
+      </button>
+
+      <div className="flex gap-2 ml-3 flex-shrink-0">
+        <button
+          onClick={() => onEdit(song)}
+          className="text-slate-500 hover:text-indigo-400 active:text-indigo-400 p-2"
+          title="Edit"
+          aria-label="Edit"
+        >
+          <EditIcon />
+        </button>
+        <button
+          onClick={() => {
+            if (confirm(`Delete "${song.name}"?`)) onDelete(song.id);
+          }}
+          className="text-slate-500 hover:text-red-400 active:text-red-400 p-2"
+          title="Delete"
+          aria-label="Delete"
+        >
+          <TrashIcon />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function SongList({
@@ -48,9 +157,27 @@ export default function SongList({
   onSelect,
   onEdit,
   onDelete,
+  onReorder,
   onNew,
   onLogout,
 }: Props) {
+  const sensors = useSensors(
+    // A few px of movement before a drag starts, so taps on the handle
+    // don't register as drags.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = songs.findIndex((s) => s.id === active.id);
+    const to = songs.findIndex((s) => s.id === over.id);
+    if (from < 0 || to < 0) return;
+    onReorder(arrayMove(songs, from, to));
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-900">
       {/* Header */}
@@ -70,7 +197,7 @@ export default function SongList({
       </div>
 
       {/* Song list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full text-slate-500">
             Loading songs...
@@ -83,55 +210,29 @@ export default function SongList({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800">
-            {songs.map((song) => (
-              <div
-                key={song.id}
-                className="flex items-center px-4 py-3 hover:bg-slate-800/50 active:bg-slate-800 transition-colors"
-              >
-                {/* Tap to play */}
-                <button
-                  onClick={() => onSelect(song)}
-                  className="flex-1 text-left min-w-0"
-                >
-                  <div className="font-semibold truncate">{song.name}</div>
-                  <div className="text-sm text-slate-500 mt-0.5">
-                    {song.bpm} BPM · {song.timeSignature} ·{' '}
-                    {song.sections.length} sections ·{' '}
-                    {song.sections.reduce((a, s) => a + s.bars, 0)} bars
-                  </div>
-                </button>
-
-                {/* Actions */}
-                <div className="flex gap-2 ml-3 flex-shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(song);
-                    }}
-                    className="text-slate-500 hover:text-indigo-400 active:text-indigo-400 p-2"
-                    title="Edit"
-                    aria-label="Edit"
-                  >
-                    <EditIcon />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Delete "${song.name}"?`)) {
-                        onDelete(song.id);
-                      }
-                    }}
-                    className="text-slate-500 hover:text-red-400 active:text-red-400 p-2"
-                    title="Delete"
-                    aria-label="Delete"
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={songs.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div>
+                {songs.map((song) => (
+                  <SongRow
+                    key={song.id}
+                    song={song}
+                    onSelect={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 

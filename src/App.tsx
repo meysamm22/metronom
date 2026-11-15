@@ -8,6 +8,7 @@ import {
   deleteSong as removeFromStore,
   syncWithRemote,
   clearLocalData,
+  saveSongOrder,
 } from './store';
 import { demoSongs } from './demoSongs';
 import Auth from './components/Auth';
@@ -113,6 +114,11 @@ export default function App() {
     setView('editor');
   };
 
+  const handleReorder = (reordered: Song[]) => {
+    saveSongOrder(reordered.map((s) => s.id));
+    setSongs(reordered);
+  };
+
   const handleDelete = (id: string) => {
     removeFromStore(id);
     refresh();
@@ -187,6 +193,7 @@ export default function App() {
       onSelect={handleSelect}
       onEdit={handleEdit}
       onDelete={handleDelete}
+      onReorder={handleReorder}
       onNew={handleNew}
       onLogout={handleLogout}
     />
