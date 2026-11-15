@@ -1,5 +1,35 @@
 import type { Song } from '../types';
 
+// Inline SVG so both icons render at exactly the same size on iOS and Android
+// (the old ✎ glyph and 🗑 emoji came from different fonts).
+const iconProps = {
+  width: 22,
+  height: 22,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+};
+
+const EditIcon = () => (
+  <svg {...iconProps}>
+    <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z" />
+    <path d="M13.5 6.5l3 3" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg {...iconProps}>
+    <path d="M4 7h16" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12" />
+    <path d="M9 7V4h6v3" />
+  </svg>
+);
+
 interface Props {
   songs: Song[];
   loading: boolean;
@@ -79,10 +109,11 @@ export default function SongList({
                       e.stopPropagation();
                       onEdit(song);
                     }}
-                    className="text-slate-500 hover:text-indigo-400 p-2 text-sm"
+                    className="text-slate-500 hover:text-indigo-400 active:text-indigo-400 p-2"
                     title="Edit"
+                    aria-label="Edit"
                   >
-                    ✎
+                    <EditIcon />
                   </button>
                   <button
                     onClick={(e) => {
@@ -91,10 +122,11 @@ export default function SongList({
                         onDelete(song.id);
                       }
                     }}
-                    className="text-slate-500 hover:text-red-400 p-2 text-sm"
+                    className="text-slate-500 hover:text-red-400 active:text-red-400 p-2"
                     title="Delete"
+                    aria-label="Delete"
                   >
-                    🗑
+                    <TrashIcon />
                   </button>
                 </div>
               </div>
