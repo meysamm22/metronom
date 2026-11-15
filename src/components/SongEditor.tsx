@@ -190,7 +190,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
           Cancel
         </button>
         <h1 className="text-lg font-bold">
-          {song ? 'Edit Song' : 'New Song'}
+          {song ? 'Edit song' : 'New song'}
         </h1>
         <button
           onClick={handleSave}
@@ -204,12 +204,12 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-5">
         {/* Song basics */}
         <div>
-          <label className="block text-sm text-slate-400 mb-1">Song Name</label>
+          <label className="block text-sm text-slate-400 mb-1">Song name</label>
           <input
             className={inputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My Song"
+            placeholder="Song title"
           />
         </div>
 
@@ -224,7 +224,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
 
         <div>
           <label className="block text-sm text-slate-400 mb-1">
-            Time Signature
+            Time signature
           </label>
           <TimeSignaturePicker value={ts} onChange={changeTimeSignature} />
         </div>
@@ -247,7 +247,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                 onClick={allCollapsed ? expandAll : collapseAll}
                 className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
               >
-                {allCollapsed ? 'Expand All' : 'Collapse All'}
+                {allCollapsed ? 'Expand all' : 'Collapse all'}
               </button>
             </div>
           </div>
@@ -359,7 +359,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
                               : 'bg-slate-700 text-slate-400 hover:text-white'
                           }`}
                         >
-                          {section.cue ? 'Cue Enabled' : '+ Add Cue'}
+                          {section.cue ? 'Cue on' : '+ Add cue'}
                         </button>
                       </div>
 

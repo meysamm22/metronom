@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Wordmark and large numerals. */
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+}
+
 :root {
   --accent: #6366f1;
   --accent-glow: #818cf8;
@@ -34,7 +40,9 @@ body {
   overflow: hidden;
   background: #0f172a;
   color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;

@@ -171,7 +171,7 @@ export default function Player({ song, onBack }: Props) {
           </>
         ) : (
           <div className="text-center">
-            <div className="text-8xl font-black text-slate-600 mb-2">
+            <div className="font-display text-8xl font-semibold tabular-nums text-slate-500 mb-2">
               {song.bpm}
             </div>
             <div className="text-slate-500 text-lg">BPM</div>

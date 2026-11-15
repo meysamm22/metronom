@@ -1,6 +1,8 @@
-# Metronom
+# Segno Cue
 
-Drummer's cue metronome with section-based playback. Runs as a web app (PWA) and as a native iOS/Android app via [Capacitor](https://capacitorjs.com/).
+Click and spoken cues that guide musicians through every section of a song. Map out a song's sections, set the tempo and time signature, and the app counts you in and calls out what's next ("chorus, 2, 3, 4") on the beat. Runs as a native iOS/Android app via [Capacitor](https://capacitorjs.com/) (and as a web app/PWA).
+
+The name comes from the *segno* (𝄋), the score marking that tells players where to go next.
 
 ## Mobile apps (Capacitor)
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
+import { Wordmark, TAGLINE } from './Brand';
 
 interface Props {
   onContinueOffline: () => void;
@@ -41,12 +42,10 @@ export default function Auth({ onContinueOffline }: Props) {
   return (
     <div className="flex flex-col items-center justify-center h-full bg-slate-900 px-6">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-black tracking-tight text-center mb-1">
-          Metronom
+        <h1 className="flex justify-center mb-3">
+          <Wordmark size="lg" />
         </h1>
-        <p className="text-sm text-slate-500 text-center mb-8">
-          Drummer's cue metronome
-        </p>
+        <p className="text-sm text-slate-400 text-center mb-10">{TAGLINE}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -81,7 +80,7 @@ export default function Auth({ onContinueOffline }: Props) {
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-lg transition-colors disabled:opacity-50"
           >
-            {loading ? '...' : isSignUp ? 'Sign Up' : 'Log In'}
+            {loading ? '...' : isSignUp ? 'Sign up' : 'Log in'}
           </button>
         </form>
 

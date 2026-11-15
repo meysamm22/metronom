@@ -1,7 +1,7 @@
 {
-  "name": "Metronom",
-  "short_name": "Metronom",
-  "description": "Drummer's cue metronome with section-based playback",
+  "name": "Segno Cue",
+  "short_name": "Segno Cue",
+  "description": "Click and spoken cues that guide musicians through every section of a song.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

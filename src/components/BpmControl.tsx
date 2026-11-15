@@ -97,7 +97,7 @@ export default function BpmControl({ value, onChange, unitHint }: Props) {
               onChange={(e) => setDraft(e.target.value)}
               onBlur={commitDraft}
               onKeyDown={(e) => e.key === 'Enter' && commitDraft()}
-              className="w-28 bg-slate-900 border border-indigo-500 rounded-lg text-center text-4xl font-black text-white py-1 focus:outline-none"
+              className="w-28 bg-slate-900 border border-indigo-500 rounded-lg text-center font-display text-4xl font-semibold text-white py-1 focus:outline-none"
             />
           ) : (
             <button
@@ -105,7 +105,7 @@ export default function BpmControl({ value, onChange, unitHint }: Props) {
                 setDraft(String(value));
                 setEditing(true);
               }}
-              className="text-5xl font-black tabular-nums text-white leading-none"
+              className="font-display text-5xl font-semibold tabular-nums text-white leading-none"
               aria-label="Type tempo"
             >
               {value}

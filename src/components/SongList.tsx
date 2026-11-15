@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import type { Song } from '../types';
+import { SegnoMark, Wordmark, TAGLINE } from './Brand';
 
 // Inline SVG so icons render at exactly the same size on iOS and Android
 // (the old ✎ glyph and 🗑 emoji came from different fonts).
@@ -183,10 +184,10 @@ export default function SongList({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Metronom</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Drummer's cue metronome
-          </p>
+          <h1>
+            <Wordmark />
+          </h1>
+          <p className="text-sm text-slate-500 mt-1.5">{TAGLINE}</p>
         </div>
         <button
           onClick={onLogout}
@@ -204,9 +205,12 @@ export default function SongList({
           </div>
         ) : songs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 px-8">
-            <div className="text-5xl mb-4 opacity-40">🥁</div>
-            <p className="text-center">
-              No songs yet. Create your first song to get started.
+            <SegnoMark className="w-16 h-16 mb-5 text-slate-700" />
+            <p className="text-slate-300 font-semibold mb-1">
+              Add your first song
+            </p>
+            <p className="text-center text-sm">
+              Set the tempo, map out the sections, and let the cues guide you.
             </p>
           </div>
         ) : (
@@ -242,7 +246,7 @@ export default function SongList({
           onClick={onNew}
           className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-lg transition-colors"
         >
-          + New Song
+          + New song
         </button>
       </div>
     </div>
