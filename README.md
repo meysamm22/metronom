@@ -34,6 +34,17 @@ npm run android   # builds the web app, syncs, and opens Android Studio
 
 Create a `.env` file with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` before building. Without them the app still works in local-only mode (no account/sync).
 
+## Tests
+
+```bash
+npm test            # run once
+npm run test:watch  # re-run on save
+```
+
+- `src/audioEngine.test.ts`: click timing (exact 60/BPM spacing, no drift, no late clicks after a UI stall), accents, cue words, beat lights vs. sound on iOS and Android, stop/restart/finish.
+- `src/types.test.ts`: every time signature's beats, accents, grouping and default cue; demo songs are playable.
+- `src/store.test.ts`: offline saving, the upload queue, sync with a fake Supabase, and song order across devices (including before the order migration).
+
 ---
 
 # React + TypeScript + Vite
