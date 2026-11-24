@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Song } from './types';
+import type { Report } from './report';
 
 /*
  * Local-first store against an in-memory fake of the Supabase songs table.
@@ -31,6 +32,8 @@ const fake = vi.hoisted(() => {
     hold: null as Promise<void> | null,
     clock: 0,
     log: [] as string[],
+    /** Phone says online but requests fail (e.g. captive Wi-Fi). */
+    networkDown: false,
   };
 
   const byPosition = (a: Row, b: Row) =>
@@ -39,6 +42,7 @@ const fake = vi.hoisted(() => {
   const client = {
     auth: {
       getUser: async () => {
+        if (state.networkDown) throw new TypeError('Failed to fetch');
         state.log.push('getUser');
         return { data: { user: state.user } };
       },
@@ -175,9 +179,11 @@ beforeEach(() => {
   server.hold = null;
   server.clock = 0;
   server.log = [];
+  server.networkDown = false;
   net.onLine = true;
   vi.stubGlobal('navigator', net);
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -452,6 +458,47 @@ describe('song order', () => {
       expect(serverOrder()).toEqual(['b', 'a']);
       expect(pending()).toEqual([]);
     });
+  });
+});
+
+describe('error reports', () => {
+  async function captureReports() {
+    const reports: Report[] = [];
+    (await import('./report')).setReporter((r) => reports.push(r));
+    return reports;
+  }
+
+  it('a server error during sync is reported', async () => {
+    const store = await newDevice();
+    const reports = await captureReports();
+    server.failUpsertFor = 'a';
+    store.saveSong(song('a', 'My Private Song'));
+    await settle();
+
+    expect(reports.map((r) => r.where)).toEqual(['store.sync']);
+    expect(reports[0].error.message).toContain('500');
+    expect(JSON.stringify(reports)).not.toContain('Private');
+  });
+
+  it('having no connection is not reported', async () => {
+    const store = await newDevice();
+    const reports = await captureReports();
+    server.networkDown = true;
+    store.saveSong(song('a'));
+    await settle();
+
+    expect(reports).toEqual([]);
+    expect(pending()).toHaveLength(1);
+  });
+
+  it('corrupt song storage is reported instead of silently showing no songs', async () => {
+    const store = await newDevice();
+    const reports = await captureReports();
+    storage.setItem('metronom.songs.v1', '{not json');
+    expect(store.loadSongs()).toEqual([]);
+    expect(reports.map((r) => [r.where, r.extra])).toEqual([
+      ['store.read', { key: 'metronom.songs.v1' }],
+    ]);
   });
 });
 

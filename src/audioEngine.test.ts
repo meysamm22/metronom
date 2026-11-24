@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AudioEngine } from './audioEngine';
+import type { Report } from './report';
 import {
   getAccentBeats,
   getBeatsPerBar,
@@ -18,10 +19,18 @@ const env = vi.hoisted(() => ({
   platform: 'ios',
   baseLatency: 0,
   outputLatency: 0,
+  /** Cue words whose recording "failed to load". */
+  missingCues: new Set<string>(),
+  /** While set, loading the cue recordings waits on it. */
+  preload: null as Promise<void> | null,
+  contextsCreated: 0,
 }));
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { getPlatform: () => env.platform },
+  Capacitor: {
+    getPlatform: () => env.platform,
+    isNativePlatform: () => env.platform !== 'web',
+  },
 }));
 vi.mock('@capacitor-community/keep-awake', () => ({
   KeepAwake: {
@@ -30,8 +39,9 @@ vi.mock('@capacitor-community/keep-awake', () => ({
   },
 }));
 vi.mock('./cueAudio', () => ({
-  preloadAllCueBuffers: () => Promise.resolve(),
-  getCueBuffer: (word: string) => ({ kind: 'cue', word }),
+  preloadAllCueBuffers: () => env.preload ?? Promise.resolve(),
+  getCueBuffer: (word: string) =>
+    env.missingCues.has(word) ? null : { kind: 'cue', word },
 }));
 
 type Sound = { kind: 'accent' | 'click' | 'cue'; word?: string };
@@ -54,6 +64,7 @@ class FakeAudioContext {
   constructor() {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     ctx = this;
+    env.contextsCreated++;
   }
   get currentTime() {
     return (Date.now() - this.t0) / 1000;
@@ -102,6 +113,13 @@ async function loadEngine(platform: 'ios' | 'android') {
   return (await import('./audioEngine')).AudioEngine;
 }
 
+/** The report module instance the freshly loaded engine uses. */
+async function captureReports() {
+  const reports: Report[] = [];
+  (await import('./report')).setReporter((r) => reports.push(r));
+  return reports;
+}
+
 function makeSong(
   timeSignature: TimeSignature,
   bpm: number,
@@ -138,6 +156,11 @@ beforeEach(() => {
   played = [];
   env.baseLatency = 0;
   env.outputLatency = 0;
+  env.missingCues = new Set();
+  env.preload = null;
+  env.contextsCreated = 0;
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -366,5 +389,77 @@ describe('start, stop and finish', () => {
     const { beats } = await play(AudioEngine, song);
     vi.advanceTimersByTime(6000);
     expect(beats).toHaveLength(8);
+  });
+});
+
+describe('safety nets', () => {
+  it('all players share one AudioContext (iOS allows only a few)', async () => {
+    const AudioEngine = await loadEngine('ios');
+    const song = makeSong('4/4', 120, [{ name: 'A', bars: 1 }]);
+    for (let i = 0; i < 10; i++) {
+      const { engine } = await play(AudioEngine, song);
+      engine.stop();
+    }
+    expect(env.contextsCreated).toBe(1);
+  });
+
+  it('Stop tapped while the sounds are still loading really stops', async () => {
+    const AudioEngine = await loadEngine('ios');
+    let release!: () => void;
+    env.preload = new Promise<void>((r) => (release = r));
+    const engine = new AudioEngine();
+    const starting = engine.start(makeSong('4/4', 120, [{ name: 'A', bars: 4 }]));
+    await Promise.resolve();
+    engine.stop();
+    release();
+    expect(await starting).toEqual([]);
+
+    vi.advanceTimersByTime(10_000);
+    expect(played).toHaveLength(0);
+    expect(engine.isPlaying).toBe(false);
+  });
+
+  it('reports which of the song’s cues have no recording, and still plays', async () => {
+    env.missingCues = new Set(['chorus', '3']);
+    const AudioEngine = await loadEngine('ios');
+    const engine = new AudioEngine();
+    const missing = await engine.start(
+      makeSong('4/4', 120, [
+        { name: 'A', bars: 2, cue: { bar: 2, words: ['chorus', '-', '3', '4'] } },
+      ])
+    );
+    expect(missing.sort()).toEqual(['3', 'chorus']);
+
+    vi.advanceTimersByTime(6000);
+    expect(clicks()).toHaveLength(8);
+    expect(played.filter((p) => p.kind === 'cue').map((p) => p.word)).toEqual(['4']);
+  });
+
+  it('a normal run reports nothing', async () => {
+    const AudioEngine = await loadEngine('android');
+    const reports = await captureReports();
+    const song = makeSong('7/8', 200, [{ name: 'A', bars: 8 }]);
+    await play(AudioEngine, song);
+    vi.advanceTimersByTime(songSeconds(song) * 1000 + 1000);
+    expect(reports).toEqual([]);
+  });
+
+  it('reports late clicks once per run, with how late and no song data', async () => {
+    const AudioEngine = await loadEngine('android');
+    const reports = await captureReports();
+    const song = makeSong('4/4', 300, [{ name: 'Secret Song Section', bars: 8 }]);
+    await play(AudioEngine, song);
+    vi.advanceTimersByTime(1000);
+    // A 500 ms stall: longer than the look-ahead can cover.
+    vi.setSystemTime(Date.now() + 500);
+    vi.advanceTimersByTime(songSeconds(song) * 1000);
+
+    expect(reports).toHaveLength(1);
+    const [r] = reports;
+    expect(r.where).toBe('audio.late');
+    expect(r.extra).toMatchObject({ bpm: 300, timeSignature: '4/4', platform: 'android' });
+    expect(Number(r.extra?.count)).toBeGreaterThan(0);
+    expect(Number(r.extra?.maxLateMs)).toBeGreaterThan(150);
+    expect(JSON.stringify(r.extra)).not.toContain('Secret');
   });
 });

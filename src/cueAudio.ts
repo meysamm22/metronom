@@ -1,3 +1,5 @@
+import { reportError } from './report';
+
 export const CUE_WORDS = [
   'intro', 'outro', 'melody', 'verse', 'chorus',
   'bridge', 'silence', 'stop', 'start',
@@ -23,12 +25,16 @@ export async function loadCueBuffer(
 
   try {
     const resp = await fetch(`/audio/${word}.wav`);
+    // Not `!resp.ok`: Capacitor iOS serves media files with a non-HTTP
+    // response, so a successful load there has status 0.
+    if (resp.status >= 400) throw new Error(`HTTP ${resp.status} loading cue audio`);
     const arrayBuf = await resp.arrayBuffer();
     const audioBuf = await ctx.decodeAudioData(arrayBuf);
     bufferCache.set(word, audioBuf);
     return audioBuf;
   } catch (e) {
-    console.warn(`Failed to load cue audio for "${word}"`, e);
+    // Not cached, so the next start() tries again.
+    reportError(e, 'audio.cue-load', { word });
     return null;
   }
 }

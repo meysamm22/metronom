@@ -1,5 +1,6 @@
 import type { Song, Section } from './types';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { isNetworkError, reportError } from './report';
 
 /**
  * Local-first song store.
@@ -63,7 +64,9 @@ function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
+  } catch (e) {
+    // Corrupt or unreadable storage: the user's songs would seem to vanish.
+    reportError(e, 'store.read', { key });
     return fallback;
   }
 }
@@ -72,7 +75,8 @@ function writeJson(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
-    console.error('Failed to write local store:', e);
+    // Usually storage full: the change is not saved on the device.
+    reportError(e, 'store.write', { key });
   }
 }
 
@@ -240,7 +244,9 @@ export async function syncWithRemote(): Promise<Song[] | null> {
     saveLocalSongs(songs);
     return applyOrder(songs);
   } catch (e) {
-    console.warn('Sync with Supabase failed (will retry later):', e);
+    // Queued changes stay queued and are retried on the next sync.
+    if (isNetworkError(e)) console.warn('Sync paused: no connection');
+    else reportError(e, 'store.sync');
     return null;
   } finally {
     syncing = false;

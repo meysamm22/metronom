@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine } from '../audioEngine';
 import type { BeatInfo, Song } from '../types';
 import { getBeatsPerBar, getAccentBeats } from '../types';
+import { reportError } from '../report';
+
+interface Notice {
+  kind: 'error' | 'warning';
+  text: string;
+}
 
 interface Props {
   song: Song;
@@ -13,6 +19,7 @@ export default function Player({ song, onBack }: Props) {
   const [playing, setPlaying] = useState(false);
   const [beatInfo, setBeatInfo] = useState<BeatInfo | null>(null);
   const [finished, setFinished] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const beatKeyRef = useRef(0);
   const [beatKey, setBeatKey] = useState(0);
 
@@ -48,8 +55,32 @@ export default function Player({ song, onBack }: Props) {
       setBeatInfo(null);
     } else {
       setFinished(false);
+      setNotice(null);
       setPlaying(true);
-      await engine.start(song);
+      try {
+        const missing = await engine.start(song);
+        if (missing.length) {
+          setNotice({
+            kind: 'warning',
+            text: `Couldn't load the ${missing.join(', ')} cue${
+              missing.length > 1 ? 's' : ''
+            }. The click still plays.`,
+          });
+        }
+      } catch (e) {
+        // Without this the button would say "Stop" while nothing plays.
+        engine.stop();
+        setPlaying(false);
+        setBeatInfo(null);
+        reportError(e, 'player.start', {
+          bpm: song.bpm,
+          timeSignature: song.timeSignature,
+        });
+        setNotice({
+          kind: 'error',
+          text: "Couldn't start the audio. Tap Play to try again. If it keeps happening, close and reopen the app.",
+        });
+      }
     }
   };
 
@@ -182,6 +213,18 @@ export default function Player({ song, onBack }: Props) {
 
       {/* Play button */}
       <div className="px-4 pb-8 pt-4">
+        {notice && (
+          <div
+            role={notice.kind === 'error' ? 'alert' : 'status'}
+            className={`mb-3 px-4 py-3 rounded-xl text-sm border ${
+              notice.kind === 'error'
+                ? 'bg-red-950/60 border-red-800 text-red-200'
+                : 'bg-amber-950/50 border-amber-800 text-amber-200'
+            }`}
+          >
+            {notice.text}
+          </div>
+        )}
         <button
           onClick={togglePlay}
           className={`w-full py-5 rounded-2xl text-xl font-bold transition-colors ${

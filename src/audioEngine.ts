@@ -3,6 +3,7 @@ import { KeepAwake } from '@capacitor-community/keep-awake';
 import type { Song, BeatInfo } from './types';
 import { getBeatsPerBar, getAccentBeats, SILENT_CUE } from './types';
 import { preloadAllCueBuffers, getCueBuffer } from './cueAudio';
+import { reportError, reportWarning } from './report';
 
 /**
  * Safari 17+ / iOS WKWebView expose navigator.audioSession. Setting it to
@@ -28,6 +29,28 @@ function requestPlaybackAudioSession(): void {
  */
 const COMPENSATE_OUTPUT_LATENCY = Capacitor.getPlatform() === 'android';
 
+/**
+ * One AudioContext for the whole app. iOS allows only a few at a time, and
+ * the player screen is opened again for every song.
+ */
+let sharedCtx: AudioContext | null = null;
+let clickAccentBuf: AudioBuffer | null = null;
+let clickNormalBuf: AudioBuffer | null = null;
+
+function audioContext(): AudioContext {
+  if (!sharedCtx || sharedCtx.state === 'closed') {
+    sharedCtx = new AudioContext();
+    clickAccentBuf = clickNormalBuf = null;
+  }
+  return sharedCtx;
+}
+
+/** Cue words in the song whose recording failed to load. */
+function missingCueWords(song: Song): string[] {
+  const words = new Set(song.sections.flatMap((s) => s.cue?.words ?? []));
+  return [...words].filter((w) => w !== SILENT_CUE && !getCueBuffer(w));
+}
+
 export type BeatCallback = (info: BeatInfo) => void;
 export type FinishCallback = () => void;
 
@@ -51,8 +74,9 @@ export class AudioEngine {
   private onBeat: BeatCallback | null = null;
   private onFinish: FinishCallback | null = null;
 
-  private clickAccentBuf: AudioBuffer | null = null;
-  private clickNormalBuf: AudioBuffer | null = null;
+  /** Clicks this run that were handed to the audio clock after their time. */
+  private lateCount = 0;
+  private maxLateMs = 0;
 
   private readonly SCHEDULE_AHEAD = 0.1;
   private readonly LOOKAHEAD_MS = 25;
@@ -66,29 +90,40 @@ export class AudioEngine {
     this.onFinish = onFinish;
   }
 
-  async start(song: Song) {
+  /**
+   * Starts the song. Resolves with the song's cue words whose recording could
+   * not be loaded (the click still plays; those cues are silent). Throws if
+   * the audio system can't be started.
+   */
+  async start(song: Song): Promise<string[]> {
     this.stop();
+    const run = this.runId;
     this.song = song;
 
     requestPlaybackAudioSession();
     // Never let the screen sleep mid-song: on iOS a locked screen suspends JS
     // timers, which would silently stop the look-ahead scheduler.
-    KeepAwake.keepAwake().catch(() => {});
+    KeepAwake.keepAwake().catch((e) => {
+      if (Capacitor.isNativePlatform()) reportError(e, 'audio.keep-awake');
+    });
 
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-    }
+    this.ctx = audioContext();
     await this.ctx.resume();
 
-    if (!this.clickAccentBuf) {
-      this.clickAccentBuf = await this.renderClick(1000, 0.7);
-    }
-    if (!this.clickNormalBuf) {
-      this.clickNormalBuf = await this.renderClick(800, 0.35);
-    }
+    if (!clickAccentBuf) clickAccentBuf = await this.renderClick(1000, 0.7);
+    if (!clickNormalBuf) clickNormalBuf = await this.renderClick(800, 0.35);
 
     await preloadAllCueBuffers(this.ctx);
 
+    // Stopped (or restarted) while loading: don't start this run.
+    if (run !== this.runId) return [];
+
+    // Each failed load is already reported by cueAudio (and retried on the
+    // next start); here the player just needs to know which cues are silent.
+    const missing = missingCueWords(song);
+
+    this.lateCount = 0;
+    this.maxLateMs = 0;
     this.sectionIdx = 0;
     this.barInSection = 0;
     this.beatInBar = 0;
@@ -97,9 +132,11 @@ export class AudioEngine {
 
     this.scheduler();
     this.timerID = window.setInterval(() => this.scheduler(), this.LOOKAHEAD_MS);
+    return missing;
   }
 
   stop() {
+    this.reportLateClicks();
     this._isPlaying = false;
     this.runId++;
     if (this.timerID !== null) {
@@ -107,6 +144,24 @@ export class AudioEngine {
       this.timerID = null;
     }
     KeepAwake.allowSleep().catch(() => {});
+  }
+
+  /**
+   * A late click is the one failure musicians hear. The look-ahead makes it
+   * rare (JS would have to stall >75 ms), so any occurrence is worth knowing.
+   */
+  private reportLateClicks() {
+    if (this.lateCount > 0 && this.song) {
+      reportWarning('Clicks played late', 'audio.late', {
+        count: this.lateCount,
+        maxLateMs: Math.round(this.maxLateMs),
+        bpm: this.song.bpm,
+        timeSignature: this.song.timeSignature,
+        platform: Capacitor.getPlatform(),
+      });
+    }
+    this.lateCount = 0;
+    this.maxLateMs = 0;
   }
 
   private async renderClick(freq: number, vol: number): Promise<AudioBuffer> {
@@ -152,7 +207,13 @@ export class AudioEngine {
       if (cueWord === SILENT_CUE) cueWord = undefined;
     }
 
-    this.playBuffer(isAccent ? this.clickAccentBuf : this.clickNormalBuf, time, 1.0);
+    const lateMs = (this.ctx.currentTime - time) * 1000;
+    if (lateMs > 1) {
+      this.lateCount++;
+      this.maxLateMs = Math.max(this.maxLateMs, lateMs);
+    }
+
+    this.playBuffer(isAccent ? clickAccentBuf : clickNormalBuf, time, 1.0);
 
     if (cueWord) {
       const cueBuf = getCueBuffer(cueWord);
@@ -224,6 +285,7 @@ export class AudioEngine {
             this.timerID = null;
           }
           KeepAwake.allowSleep().catch(() => {});
+          this.reportLateClicks();
           const run = this.runId;
           setTimeout(() => {
             if (this.runId === run) this.onFinish?.();
