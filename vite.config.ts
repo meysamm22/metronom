@@ -24,6 +24,10 @@ export default defineConfig({
     uploadSourceMaps &&
       sentryVitePlugin({
         telemetry: false,
+        // Maps are matched to crashes by debug IDs. No release here: it
+        // would send git history (author emails) and wouldn't match the
+        // app's own release name (bundle id @ version + build).
+        release: { create: false, setCommits: false, finalize: false, inject: false },
         sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
       }),
   ],
