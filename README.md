@@ -44,6 +44,15 @@ npm run test:watch  # re-run on save
 - `src/audioEngine.test.ts`: click timing (exact 60/BPM spacing, no drift, no late clicks after a UI stall), accents, cue words, beat lights vs. sound on iOS and Android, stop/restart/finish.
 - `src/types.test.ts`: every time signature's beats, accents, grouping and default cue; demo songs are playable.
 - `src/store.test.ts`: offline saving, the upload queue, sync with a fake Supabase, and song order across devices (including before the order migration).
+- `src/report.test.ts`, `src/sentry.test.ts`, `src/cueAudio.test.ts`: error reporting, what data leaves the phone, cue loading on iOS.
+
+## Error reporting (Sentry)
+
+All errors go through `src/report.ts`. In release builds of the iOS/Android apps they are sent to Sentry (EU region, Frankfurt); development builds and the website send nothing. No personal data is sent: no user, IP, email or song content (see `src/sentry.ts`).
+
+- `VITE_SENTRY_DSN` in `.env` turns it on. The DSN is public by design (it can only send reports).
+- Readable stack traces: create `.env.sentry-build-plugin` (gitignored) with `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT`. Builds then upload source maps and delete them, so they never ship.
+- Check that reports arrive: `VITE_SENTRY_TEST=1 npm run sync`, run the app once, then rebuild normally with `npm run sync`. Never ship a test build.
 
 ---
 

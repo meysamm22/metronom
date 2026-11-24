@@ -9,7 +9,9 @@ import './index.css';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { installGlobalHandlers } from './report';
+import { initSentry } from './sentry';
 
+initSentry();
 installGlobalHandlers();
 
 createRoot(document.getElementById('root')!).render(
